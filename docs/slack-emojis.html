@@ -119,10 +119,11 @@
       <span id="title">Emoji Gallery<span id="subtitle"></span></span>
       <input id="search" type="search" placeholder="Search emojis…" autocomplete="off">
       <input id="size-slider" type="range" min="32" max="200" value="80" title="Card size">
-      <select id="uploader"><option value="">All uploaders</option></select>
       <span id="count"></span>
     </div>
-    <div id="cat-filters"></div>
+    <div id="cat-filters">
+      <select id="uploader"><option value="">All uploaders</option></select>
+    </div>
     <button class="pill" id="gif-toggle" style="display:none">GIF</button>
   </header>
   <div id="grid"></div>
@@ -276,6 +277,7 @@
     while (sel.options.length > 1) sel.remove(1);
     unique.forEach(function (u) { var o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); });
     sel.style.display = unique.length ? '' : 'none';
+    if (unique.length) document.getElementById('cat-filters').style.display = 'flex';
   }
 
   // ── Filter + render ───────────────────────────────────────────────────────
@@ -330,11 +332,26 @@
       card.appendChild(nameEl);
       card.addEventListener('click', function () {
         var text = ':' + e.name + ':';
-        navigator.clipboard.writeText(text).then(function () {
+        function onSuccess() {
           card.classList.add('copied');
           setTimeout(function () { card.classList.remove('copied'); }, 700);
           toast('Copied ' + text);
-        });
+        }
+        function fallback() {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.cssText = 'position:fixed;opacity:0';
+          document.body.appendChild(ta);
+          ta.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) onSuccess(); else toast('Copy failed');
+        }
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(onSuccess, fallback);
+        } else {
+          fallback();
+        }
       });
       frag.appendChild(card);
     });
