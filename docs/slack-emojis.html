@@ -16,25 +16,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 13px; min-height: 100vh; }
 
-    /* ── Loading splash ── */
-    #loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; padding: 40px; text-align: center; }
-    #loader h1 { font-size: 28px; }
-    #loader > p { color: var(--muted); max-width: 420px; line-height: 1.6; }
-    #loader small { color: var(--muted); font-size: 11px; }
-    #drop-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 44px 60px; cursor: pointer; transition: border-color .15s, background .15s; width: 100%; max-width: 460px; }
-    #drop-zone:hover, #drop-zone.over { border-color: var(--accent); background: rgba(74,143,191,.06); }
-    #drop-zone .icon { font-size: 44px; margin-bottom: 8px; }
-    #drop-zone p { color: var(--muted); font-size: 14px; }
-    #drop-zone strong { color: var(--text); }
-    .btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 9px 22px; font-size: 14px; cursor: pointer; margin-top: 10px; }
-    .btn:hover { filter: brightness(1.15); }
-    #file-input { display: none; }
-    #load-err { color: #f87171; display: none; font-size: 13px; }
-    #spin { font-size: 32px; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     /* ── App ── */
-    #app { display: none; flex-direction: column; min-height: 100vh; }
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
 
     /* ── Header ── */
     header { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
@@ -44,12 +27,9 @@
     #search { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px; width: 200px; outline: none; }
     #search:focus { border-color: var(--accent); }
     #search::placeholder { color: var(--muted); }
-    #source-filters { display: flex; gap: 4px; }
     .pill { background: transparent; border: 1px solid var(--border); border-radius: 20px; color: var(--muted); padding: 4px 11px; font-size: 12px; cursor: pointer; transition: all .12s; }
     .pill:hover { border-color: var(--accent); color: var(--text); }
     .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .pill.slack.active  { background: #6a3a8a; border-color: #6a3a8a; }
-    .pill.notion.active { background: #444;    border-color: #666; }
     .pill.cat-ctrl.active { background: #555; border-color: #777; color: #fff; }
     #uploader { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 12px; outline: none; max-width: 180px; display: none; }
     #cat-filters { display: none; flex-wrap: wrap; gap: 5px; align-items: center; padding-top: 2px; border-top: 1px solid var(--border); }
@@ -101,18 +81,6 @@
 </head>
 <body>
 
-<div id="loader">
-  <h1>Emoji Gallery</h1>
-  <p id="loader-msg">Choose your JSON files to get started.</p>
-  <div id="drop-zone" tabindex="0">
-    <div class="icon">📂</div>
-    <p>Drop <strong>slack-emojis-*.json</strong> and <strong>slack-emojis-tags.json</strong> here<br>or click to browse — select both files at once (Cmd+click)</p>
-    <button class="btn" id="browse-btn">Choose files</button>
-  </div>
-  <p id="load-err"></p>
-</div>
-<input type="file" id="file-input" accept=".json" multiple>
-
 <div id="app">
   <header>
     <div class="header-row">
@@ -153,76 +121,17 @@
   var renderOffset = 0;
 
   // ── Startup ───────────────────────────────────────────────────────────────
-  if (window.EMOJI_DATA) {
-    data = window.EMOJI_DATA;
-    data.forEach(function (e) { e.animated = /\.gif($|\?)/i.test(e.imageUrl || ''); });
-    init();
-  } else {
-    wireDropZone();
-  }
-
-  function mergeTags(tagsMap) {
-    data.forEach(function (e) {
-      var t = tagsMap[e.name];
-      if (!t) return;
-      if (t.category) e.category = t.category;
-      if (t.tags)     e.tags     = t.tags;
-      if (t.animated !== undefined) e.animated = t.animated;
-    });
-  }
-
-  // ── Manual file loading (fallback) ───────────────────────────────────────
-
-  function wireDropZone() {
-    var fileInput = document.getElementById('file-input');
-    var dropZone  = document.getElementById('drop-zone');
-    document.getElementById('browse-btn').addEventListener('click', function (e) { e.stopPropagation(); fileInput.click(); });
-    dropZone.addEventListener('click', function () { fileInput.click(); });
-    dropZone.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
-    fileInput.addEventListener('change', function (e) { loadFiles(Array.from(e.target.files)); e.target.value = ''; });
-    dropZone.addEventListener('dragover',  function (e) { e.preventDefault(); dropZone.classList.add('over'); });
-    dropZone.addEventListener('dragleave', function ()  { dropZone.classList.remove('over'); });
-    dropZone.addEventListener('drop', function (e) {
-      e.preventDefault(); dropZone.classList.remove('over');
-      loadFiles(Array.from(e.dataTransfer.files).filter(function (f) { return f.name.endsWith('.json'); }));
-    });
-  }
-
-  function loadFiles(files) {
-    var errEl = document.getElementById('load-err');
-    errEl.style.display = 'none';
-    if (!files.length) return;
-    Promise.all(files.map(function (f) { return f.text().then(function (txt) { return { name: f.name, json: JSON.parse(txt) }; }); }))
-      .then(function (results) {
-        var tags = null;
-        var emojiSets = [];
-        results.forEach(function (r) {
-          if (r.name === 'slack-emojis-tags.json') {
-            tags = r.json;
-          } else {
-            emojiSets.push(r.json);
-          }
-        });
-        data = [].concat.apply([], emojiSets);
-        if (!data.length) throw new Error('No emoji entries found. Make sure you include slack-emojis-*.json.');
-        data.forEach(function (e) { e.animated = /\.gif($|\?)/i.test(e.imageUrl || ''); });
-        if (tags) mergeTags(tags);
-        init();
-      })
-      .catch(function (e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = ''; });
-  }
+  data = window.EMOJI_DATA;
+  data.forEach(function (e) { e.animated = /\.gif($|\?)/i.test(e.imageUrl || ''); });
+  init();
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
   function init() {
     document.getElementById('subtitle').textContent = ' · ' + data.length.toLocaleString() + ' emojis';
-
     buildCategoryChips();
     buildUploaderDropdown();
     applyFilters();
-
-    document.getElementById('loader').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
   }
 
   // ── Category chips (single-select tabs) ──────────────────────────────────
